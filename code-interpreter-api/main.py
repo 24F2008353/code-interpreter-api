@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sys
 import traceback
-import re
 from io import StringIO
 
 app = FastAPI()
@@ -33,11 +32,20 @@ def execute_python_code(code: str):
         }
 
     except Exception:
+        tb = traceback.extract_tb(sys.exc_info()[2])
+
+        line_numbers = []
+
+        for frame in tb:
+            if frame.filename == "<string>":
+                line_numbers = [frame.lineno]
+
         output = traceback.format_exc()
 
         return {
             "success": False,
-            "output": output
+            "output": output,
+            "line_numbers": line_numbers
         }
 
     finally:
@@ -55,16 +63,9 @@ def code_interpreter(req: CodeRequest):
             "result": result["output"]
         }
 
-    traceback_text = result["output"]
-
-    line_numbers = [
-        int(x)
-        for x in re.findall(r'line (\d+)', traceback_text)
-    ]
-
     return {
-        "error": sorted(list(set(line_numbers))),
-        "result": traceback_text
+        "error": result.get("line_numbers", []),
+        "result": result["output"]
     }
 
 
